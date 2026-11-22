@@ -1,17 +1,19 @@
 package io.github.nader7.dealsapi.mapper;
 
 import io.github.nader7.dealsapi.dto.ActiveDeal;
+import io.github.nader7.dealsapi.dto.PeakTimeResponse;
 import io.github.nader7.dealsapi.model.ActiveRestaurantDeal;
 import io.github.nader7.dealsapi.model.Deal;
+import io.github.nader7.dealsapi.model.PeakTime;
 import io.github.nader7.dealsapi.model.Restaurant;
 import org.junit.jupiter.api.*;
 
 import java.time.LocalTime;
 import java.util.List;
 
-class ActiveDealsMapperTest {
+class DealsResponseMapperTest {
 
-    private final ActiveDealsMapper activeDealsMapper = new ActiveDealsMapper();
+    private final DealsResponseMapper dealsResponseMapper = new DealsResponseMapper();
     private ActiveRestaurantDeal activeRestaurantDeal = new ActiveRestaurantDeal(null, null);
 
     @Test
@@ -21,7 +23,7 @@ class ActiveDealsMapperTest {
                 createDeal(5)
         );
 
-        Assertions.assertEquals(createActiveDeal("3:00pm", "9:00pm", "5"), activeDealsMapper.toActiveDeal(activeRestaurantDeal));
+        Assertions.assertEquals(createActiveDeal("3:00pm", "9:00pm", "5"), dealsResponseMapper.toActiveDeal(activeRestaurantDeal));
     }
 
     @Test
@@ -31,7 +33,7 @@ class ActiveDealsMapperTest {
                 createDeal(3)
         );
 
-        Assertions.assertEquals(createActiveDeal("11:14am", "7:32pm", "3"), activeDealsMapper.toActiveDeal(activeRestaurantDeal));
+        Assertions.assertEquals(createActiveDeal("11:14am", "7:32pm", "3"), dealsResponseMapper.toActiveDeal(activeRestaurantDeal));
     }
 
     @Test
@@ -41,7 +43,7 @@ class ActiveDealsMapperTest {
                 createDeal(1)
         );
 
-        Assertions.assertEquals(createActiveDeal("12:00pm", "12:00am", "1"), activeDealsMapper.toActiveDeal(activeRestaurantDeal));
+        Assertions.assertEquals(createActiveDeal("12:00pm", "12:00am", "1"), dealsResponseMapper.toActiveDeal(activeRestaurantDeal));
     }
 
     @Test
@@ -51,7 +53,7 @@ class ActiveDealsMapperTest {
                 createDeal(null)
         );
 
-        Assertions.assertEquals(createActiveDeal("3:00pm", "9:00pm", null), activeDealsMapper.toActiveDeal(activeRestaurantDeal));
+        Assertions.assertEquals(createActiveDeal("3:00pm", "9:00pm", null), dealsResponseMapper.toActiveDeal(activeRestaurantDeal));
     }
 
     @Test
@@ -61,9 +63,29 @@ class ActiveDealsMapperTest {
                 createDeal(5)
         );
 
-        Assertions.assertEquals(createActiveDeal(null, null, "5"), activeDealsMapper.toActiveDeal(activeRestaurantDeal));
+        Assertions.assertEquals(createActiveDeal(null, null, "5"), dealsResponseMapper.toActiveDeal(activeRestaurantDeal));
     }
 
+    @Test
+    void testToPeakTimeResponse() {
+        PeakTime peakTime = new PeakTime(LocalTime.of(18, 0), LocalTime.of(21, 0));
+
+        Assertions.assertEquals(new PeakTimeResponse("6:00pm", "9:00pm"), dealsResponseMapper.toPeakTimeResponse(peakTime));
+    }
+
+    @Test
+    void testToPeakTimeResponseNoPeakTime() {
+        PeakTime peakTime = new PeakTime(null, null);
+
+        Assertions.assertEquals(new PeakTimeResponse(null, null), dealsResponseMapper.toPeakTimeResponse(peakTime));
+    }
+
+    @Test
+    void testToPeakTimeResponsePeakAllDay() {
+        PeakTime peakTime = new PeakTime(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT);
+
+        Assertions.assertEquals(new PeakTimeResponse("12:00am", "12:00am"), dealsResponseMapper.toPeakTimeResponse(peakTime));
+    }
 
     private static Restaurant createRestaurant(LocalTime open, LocalTime close) {
         return new Restaurant(
