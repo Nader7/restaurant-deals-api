@@ -4,6 +4,7 @@ import io.github.nader7.dealsapi.dto.RestaurantDealsData;
 import io.github.nader7.dealsapi.exception.RestaurantDataUnavailableException;
 import io.github.nader7.dealsapi.mapper.RestaurantDealsMapper;
 import io.github.nader7.dealsapi.model.Deal;
+import io.github.nader7.dealsapi.model.PeakTime;
 import io.github.nader7.dealsapi.model.Restaurant;
 import org.junit.jupiter.api.*;
 import org.mockito.Mockito;
@@ -262,6 +263,124 @@ class ActiveDealServiceTest {
     void findActiveDealsFailedApiCall() {
         Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenThrow(new RestaurantDataUnavailableException("Failed to get restaurant data"));
         Assertions.assertThrows(RestaurantDataUnavailableException.class, () -> activeDealService.findActiveDeals("15:00"));
+    }
+
+
+    @Test
+    void findPeakTime() {
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurantDeals);
+
+        Assertions.assertEquals(new PeakTime(LocalTime.of(18, 0), LocalTime.of(21, 0)), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeOvernight() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", LocalTime.of(20, 34), LocalTime.of(2, 12),
+                        List.of(createDeal("DEAL-1", null, null, 5))),
+                createRestaurant("ID-222-222", LocalTime.of(22, 24), LocalTime.of(4, 0),
+                        List.of(createDeal("DEAL-2", null, null, 5)))
+        );
+
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+        //When both deals are active
+        Assertions.assertEquals(new PeakTime(LocalTime.of(22, 24), LocalTime.of(2, 12)), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeNoRestaurants() {
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(new ArrayList<>());
+
+        Assertions.assertEquals(new PeakTime(null, null), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeIgnoreSoldOutDeals() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", LocalTime.of(9, 0), LocalTime.of(11, 0), List.of(
+                        createDeal("DEAL-1", null, null, 0),
+                        createDeal("DEAL-1-2", null, null, 0),
+                        createDeal("DEAL-1-3", null, null, 0))),
+                createRestaurant("ID-222-222", LocalTime.of(14, 0), LocalTime.of(16, 0),
+                        List.of(createDeal("DEAL-2", null, null, 5)))
+        );
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+
+        //Morning deals are sold out
+        Assertions.assertEquals(new PeakTime(LocalTime.of(14, 0), LocalTime.of(16, 0)), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeOnlySoldOutDeals() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", LocalTime.of(10, 0), LocalTime.of(14, 0),
+                        List.of(createDeal("DEAL-1", null, null, 0))),
+                createRestaurant("ID-222-222", LocalTime.of(13, 0), LocalTime.of(18, 0),
+                        List.of(createDeal("DEAL-2", null, null, 0)))
+        );
+
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+
+        Assertions.assertEquals(new PeakTime(null, null), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeMultiplePeaks() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", LocalTime.of(10, 0), LocalTime.of(14, 0),
+                        List.of(createDeal("DEAL-1", null, null, 5), createDeal("DEAL-1-2", null, null, 3))),
+                createRestaurant("ID-222-222", LocalTime.of(15, 0), LocalTime.of(18, 0),
+                        List.of(createDeal("DEAL-2", null, null, 3), createDeal("DEAL-2-2", null, null, 2))),
+                createRestaurant("ID-222-222", LocalTime.of(19, 0), LocalTime.of(22, 0),
+                        List.of(createDeal("DEAL-3", null, null, 0)))
+        );
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+
+        Assertions.assertEquals(
+                new PeakTime(LocalTime.of(10, 0), LocalTime.of(14, 0)),
+                activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeBackToBackDeals() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", LocalTime.of(10, 0), LocalTime.of(20, 0),
+                        List.of(createDeal("DEAL-1", LocalTime.of(10, 0), LocalTime.of(12, 0), 5),
+                                createDeal("DEAL-1-2", LocalTime.of(12, 0), LocalTime.of(15, 0), 3)))
+        );
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+
+        //Window should extend across both deals
+        Assertions.assertEquals(new PeakTime(LocalTime.of(10, 0), LocalTime.of(15, 0)), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeDealsAllDay() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", null, null,
+                        List.of(createDeal("DEAL-1", null, null, 5), createDeal("DEAL-1-2", null, null, 3))),
+                createRestaurant("ID-222-222", LocalTime.of(11, 0), LocalTime.of(11, 0),
+                        List.of(createDeal("DEAL-2", null, null, 3), createDeal("DEAL-2-2", null, null, 2))),
+                createRestaurant("ID-222-222", LocalTime.of(12, 0), LocalTime.of(12, 0),
+                        List.of(createDeal("DEAL-3", null, null, 0)))
+        );
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+
+        Assertions.assertEquals(new PeakTime(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT), activeDealService.findPeakTime());
+    }
+
+    @Test
+    void findPeakTimeIgnoreDealOutsideRestaurantHours() {
+        List<Restaurant> restaurants = List.of(
+                createRestaurant("ID-111-111", LocalTime.of(10, 0), LocalTime.of(14, 0),
+                        List.of(createDeal("DEAL-1", LocalTime.of(14, 0), LocalTime.of(17, 0), 5),
+                                createDeal("DEAL-1-2", LocalTime.of(14, 30), LocalTime.of(17, 30), 5))),
+                createRestaurant("ID-222-222", LocalTime.of(13, 0), LocalTime.of(18, 0),
+                        List.of(createDeal("DEAL-2", null, null, 1)))
+        );
+        Mockito.when(restaurantDealsProvider.getRestaurantDeals()).thenReturn(restaurants);
+
+        Assertions.assertEquals(new PeakTime(LocalTime.of(13, 0), LocalTime.of(18, 0)), activeDealService.findPeakTime());
     }
 
     private static Restaurant createRestaurant(String objectId, LocalTime open, LocalTime close, List<Deal> deals) {

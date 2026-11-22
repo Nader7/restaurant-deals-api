@@ -2,7 +2,9 @@ package io.github.nader7.dealsapi.controller;
 
 import io.github.nader7.dealsapi.dto.ActiveDeal;
 import io.github.nader7.dealsapi.dto.ActiveDealsResponse;
-import io.github.nader7.dealsapi.mapper.ActiveDealsMapper;
+import io.github.nader7.dealsapi.dto.PeakTimeResponse;
+import io.github.nader7.dealsapi.mapper.DealsResponseMapper;
+import io.github.nader7.dealsapi.model.PeakTime;
 import io.github.nader7.dealsapi.service.ActiveDealService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,11 +21,11 @@ public class DealsController {
     private static final Logger log = LoggerFactory.getLogger(DealsController.class);
 
     private final ActiveDealService activeDealService;
-    private final ActiveDealsMapper activeDealsMapper;
+    private final DealsResponseMapper dealsResponseMapper;
 
-    public DealsController(ActiveDealService activeDealService, ActiveDealsMapper activeDealsMapper){
+    public DealsController(ActiveDealService activeDealService, DealsResponseMapper dealsResponseMapper){
         this.activeDealService = activeDealService;
-        this.activeDealsMapper = activeDealsMapper;
+        this.dealsResponseMapper = dealsResponseMapper;
     }
 
     /**
@@ -36,10 +38,22 @@ public class DealsController {
     @GetMapping("/deals")
     public ActiveDealsResponse getDeals(@RequestParam String timeOfDay){
         List<ActiveDeal> deals = activeDealService.findActiveDeals(timeOfDay).stream()
-                .map(activeDealsMapper::toActiveDeal)
+                .map(dealsResponseMapper::toActiveDeal)
                 .toList();
 
         log.info("Returning {} active deals for timeOfDay={}", deals.size(), timeOfDay);
         return new ActiveDealsResponse(deals);
+    }
+
+    /**
+     * Returns the time window during which most deals are active.
+     *
+     * @return the start and end time when most deals are active and null if there are no active deals
+     */
+    @GetMapping("/peak-time")
+    public PeakTimeResponse getPeakTime(){
+        PeakTime peakTime = activeDealService.findPeakTime();
+
+        return dealsResponseMapper.toPeakTimeResponse(peakTime);
     }
 }
